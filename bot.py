@@ -147,4 +147,4 @@ def check_achievements(game: 'Game') -> list:
         achievements.append("🌳 Покоритель лесов")
     return achievements
 
-@d
+
