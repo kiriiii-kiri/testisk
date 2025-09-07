@@ -5,28 +5,32 @@ BOARD_SIZE = 10
 
 class Game:
     def __init__(self, user_id, username):
-        self.user_id = user_id
-        self.username = username
-        self.level = 1  # 1=Пещера, 2=Равнина, 3=Лес
-        self.level_names = {1: "Пещера 🕳️", 2: "Равнина 🌾", 3: "Лес 🌲"}
-        self.level_name = self.level_names[self.level]
-        self.snake = [(5, 5)]  # начальная позиция
-        self.direction = "right"
-        self.score = 0
-        self.is_alive = True
-        self.food = self.spawn_food()
-        self.bonus = None
-        self.bonus_type = None
-        self.bonus_timer = 0
-        self.portal1 = None
-        self.portal2 = None
-        self.mobs = []
-        self.obstacles = generate_obstacles(self.level)
-        self.mobs_eaten = 0
-        self.bonuses_collected = set()
-        self.spawn_bonus()
-        self.spawn_portal()
-        self.spawn_mobs()
+    self.user_id = user_id
+    self.username = username
+    self.level = 1  # 1=Пещера, 2=Равнина, 3=Лес
+    self.level_names = {1: "Пещера 🕳️", 2: "Равнина 🌾", 3: "Лес 🌲"}
+    self.level_name = self.level_names[self.level]
+    self.snake = [(5, 5)]  # начальная позиция
+    self.direction = "right"
+    self.score = 0
+    self.is_alive = True
+
+    # 🔥 Сначала инициализируем ВСЕ структуры данных
+    self.obstacles = generate_obstacles(self.level)
+    self.mobs = []
+    self.bonus = None
+    self.bonus_type = None
+    self.bonus_timer = 0
+    self.portal1 = None
+    self.portal2 = None
+    self.mobs_eaten = 0
+    self.bonuses_collected = set()
+
+    # 🔥 Только ПОСЛЕ этого — спавним объекты
+    self.food = self.spawn_food()
+    self.spawn_bonus()
+    self.spawn_portal()
+    self.spawn_mobs()
 
     def spawn_food(self):
         while True:
