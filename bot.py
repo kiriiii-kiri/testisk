@@ -8,9 +8,9 @@ from aiogram.enums import ParseMode
 from game import Game
 from database import init_db, get_user_record, update_user_record, get_top_players
 
-# 🔥 ИСПРАВЛЕНО: УБРАЛ ПРОБЕЛЫ В URL!
+# 🔥 ГАРАНТИРОВАННО ЧИСТЫЙ URL — ОБРЕЗАЕМ ПРОБЕЛЫ!
 BOT_TOKEN = "8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc"
-WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook"  # ← ТОЛЬКО ТАК!
+WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook".strip()  # ← .strip() УДАЛЯЕТ ВСЕ ПРОБЕЛЫ!
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -18,6 +18,7 @@ dp = Dispatcher()
 
 init_db()
 active_games = {}
+
 
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
@@ -113,32 +114,45 @@ def check_achievements(game: 'Game') -> list:
 @dp.message()
 async def any_message(message: types.Message):
     await message.answer("Нажми /start для начала игры!")
-
+    
 async def on_startup():
-    # Удаляем старый вебхук
+    logging.info("🔄 Начинаем инициализацию...")
+    
+    # Шаг 1: Удаляем ЛЮБОЙ существующий вебхук
+    logging.info("🗑️ Удаляем старый вебхук...")
     await bot.delete_webhook(drop_pending_updates=True)
-    # Устанавливаем новый
+    await asyncio.sleep(1)  # Даём Telegram время применить изменения
+
+    # Шаг 2: Проверяем текущий статус вебхука
     webhook_info = await bot.get_webhook_info()
+    logging.info(f"📡 Текущий вебхук: '{webhook_info.url}'")
+
+    # Шаг 3: Устанавливаем НОВЫЙ вебхук, только если URL изменился
     if webhook_info.url != WEBHOOK_URL:
-        await bot.set_webhook(WEBHOOK_URL)
-        logging.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
+        logging.info(f"🔗 Устанавливаем новый вебхук: {WEBHOOK_URL}")
+        result = await bot.set_webhook(WEBHOOK_URL)
+        if result:
+            logging.info("✅ Вебхук успешно установлен!")
+        else:
+            logging.error("❌ Не удалось установить вебхук!")
     else:
-        logging.info("✅ Webhook уже установлен.")
+        logging.info("✅ Вебхук уже установлен — пропускаем.")
 
 async def on_shutdown():
+    logging.info("👋 Завершаем работу...")
     await bot.delete_webhook()
-    logging.info("👋 Webhook удалён.")
+    logging.info("🗑️ Вебхук удалён.")
 
 async def main():
-    # Регистрируем хуки
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Запускаем polling, но с параметром, совместимым с вебхуком
-    # Это НЕ конфликтует, если вебхук установлен правильно
+    # Запускаем polling — он будет работать, если вебхук установлен правильно
     await dp.start_polling(
         bot,
-        allowed_updates=["message", "callback_query"]  # Только нужные апдейты
+        allowed_updates=["message", "callback_query"],
+        handle_as_tasks=True,
+        polling_timeout=30
     )
 
 if __name__ == "__main__":
