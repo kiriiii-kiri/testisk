@@ -35,6 +35,9 @@ async def start_handler(message: types.Message):
 
 @dp.callback_query(lambda c: c.data == "start_game")
 async def start_game(callback: types.CallbackQuery):
+    logging.info(f"🎮 Кнопка 'Начать игру' нажата пользователем {callback.from_user.id}")
+    await callback.answer()  # ← ОТВЕЧАЕМ НА КНОПКУ!
+
     user_id = callback.from_user.id
     username = callback.from_user.username or f"User{user_id}"
     game = Game(user_id, username)
@@ -147,10 +150,9 @@ async def main():
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Запускаем polling — он будет работать, если вебхук установлен правильно
     await dp.start_polling(
         bot,
-        allowed_updates=["message", "callback_query"],
+        allowed_updates=["message", "callback_query"],  # ← callback_query ОБЯЗАТЕЛЕН!
         handle_as_tasks=True,
         polling_timeout=30
     )
