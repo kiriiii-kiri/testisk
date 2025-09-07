@@ -58,10 +58,8 @@ async def start_game(callback: types.CallbackQuery):
     msg = await callback.message.answer(
         f"```\n{board}\n```\n{status}",
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=get_control_keyboard()
+        reply_markup=await get_control_keyboard()
     )
-    # Сохраняем ID нового сообщения в игре (если захочешь расширить)
-    # game.message_id = msg.message_id
 
 async def get_control_keyboard():
     kb = [
@@ -128,9 +126,6 @@ async def handle_move(callback: types.CallbackQuery):
                 logging.error(f"❌ Ошибка при показе Game Over: {e}")
             del active_games[user_id]
             return
-
-        # 🔥 ФИКС: Клавиатура НЕ обновляется, если не нужно — убираем моргание
-        # Клавиатура остаётся той же — не вызываем edit_reply_markup
 
 @dp.callback_query(lambda c: c.data == "show_leaderboard")
 async def show_leaderboard(callback: types.CallbackQuery):
