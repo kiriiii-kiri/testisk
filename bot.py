@@ -8,17 +8,23 @@ from aiogram.enums import ParseMode
 from game import Game
 from database import init_db, get_user_record, update_user_record, get_top_players
 
-# 🔥 ГАРАНТИРОВАННО ЧИСТЫЙ URL — ОБРЕЗАЕМ ПРОБЕЛЫ!
+# 🔥 ФИКС: УБРАЛИ ПРОБЕЛЫ ИЗ URL
 BOT_TOKEN = "8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc"
-WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook".strip()  # ← .strip() УДАЛЯЕТ ВСЕ ПРОБЕЛЫ!
+WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook".strip()  # ← Без пробелов!
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 init_db()
+# 🔥 ФИКС: Используем словарь с блокировками для потокобезопасности
 active_games = {}
+game_locks = {}  # user_id -> asyncio.Lock
 
+def get_user_lock(user_id: int) -> asyncio.Lock:
+    if user_id not in game_locks:
+        game_locks[user_id] = asyncio.Lock()
+    return game_locks[user_id]
 
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
@@ -35,63 +41,26 @@ async def start_handler(message: types.Message):
 
 @dp.callback_query(lambda c: c.data == "start_game")
 async def start_game(callback: types.CallbackQuery):
-    logging.info(f"🎮 Кнопка 'Начать игру' нажата пользователем {callback.from_user.id}")
-    await callback.answer()  # ← ОТВЕЧАЕМ НА КНОПКУ!
-
     user_id = callback.from_user.id
+    logging.info(f"🎮 [USER {user_id}] Нажата кнопка 'Начать игру'")
+    await callback.answer()  # Подтверждаем нажатие сразу
+
     username = callback.from_user.username or f"User{user_id}"
     game = Game(user_id, username)
     active_games[user_id] = game
-    await update_game_message(callback.message, game)
-    await send_control_buttons(callback.message, game)
 
-@dp.callback_query(lambda c: c.data.startswith("move_"))
-async def handle_move(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    if user_id not in active_games:
-        await callback.answer("Игра не найдена. Начни новую!", show_alert=True)
-        return
-    game = active_games[user_id]
-    if not game.is_alive:
-        await callback.answer("Игра окончена! Начни заново.", show_alert=True)
-        return
-    direction = callback.data.split("_")[1]
-    game.move(direction)
-    await update_game_message(callback.message, game)
-    if not game.is_alive:
-        record_updated = update_user_record(game.user_id, game.username, game.score)
-        achievements = check_achievements(game)
-        msg = f"💀 *GAME OVER*\n\nОчки: {game.score}\nДлина: {len(game.snake)}"
-        if record_updated: msg += "\n\n🏆 *Новый личный рекорд!*"
-        if achievements: msg += "\n\n🎖️ *Новые достижения:*\n" + "\n".join(achievements)
-        kb = [[InlineKeyboardButton(text="🔄 Играть снова", callback_data="start_game")]]
-        await callback.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode=ParseMode.MARKDOWN)
-        del active_games[user_id]
-        return
-    await send_control_buttons(callback.message, game)
-
-@dp.callback_query(lambda c: c.data == "show_leaderboard")
-async def show_leaderboard(callback: types.CallbackQuery):
-    top_players = get_top_players()
-    msg = "🏆 *Топ-10 игроков:*\n\n" + "\n".join(f"{i}. @{username} — {score} очков" for i, (username, score) in enumerate(top_players, 1))
-    kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="start_game")]]
-    await callback.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode=ParseMode.MARKDOWN)
-
-@dp.callback_query(lambda c: c.data == "show_achievements")
-async def show_achievements(callback: types.CallbackQuery):
-    msg = "🎖️ *Достижения:*\n\n1. 🌱 *Новичок* — набрать 10 очков\n2. 🐉 *Охотник* — съесть 5 мобов\n3. 💎 *Коллекционер* — собрать 3 разных бонуса\n4. 🧗 *Альпинист* — пройти уровень 'Пещера'\n5. 🌳 *Покоритель лесов* — пройти уровень 'Лес'"
-    kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="start_game")]]
-    await callback.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode=ParseMode.MARKDOWN)
-
-async def update_game_message(message: types.Message, game: 'Game'):
+    # 🔥 ФИКС: Отправляем НОВОЕ сообщение вместо редактирования старого
     board = game.render_board()
     status = f"\nОчки: {game.score} 🎯 | Длина: {len(game.snake)} 🐍 | Уровень: {game.level_name}"
-    try:
-        await message.edit_text(f"```\n{board}\n```\n{status}", parse_mode=ParseMode.MARKDOWN)
-    except:
-        pass
+    msg = await callback.message.answer(
+        f"```\n{board}\n```\n{status}",
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=get_control_keyboard()
+    )
+    # Сохраняем ID нового сообщения в игре (если захочешь расширить)
+    # game.message_id = msg.message_id
 
-async def send_control_buttons(message: types.Message, game: 'Game'):
+async def get_control_keyboard():
     kb = [
         [InlineKeyboardButton(text="⬆️", callback_data="move_up")],
         [
@@ -100,10 +69,80 @@ async def send_control_buttons(message: types.Message, game: 'Game'):
             InlineKeyboardButton(text="➡️", callback_data="move_right")
         ]
     ]
-    try:
-        await message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
-    except:
-        pass
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+@dp.callback_query(lambda c: c.data.startswith("move_"))
+async def handle_move(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    logging.info(f"🐍 [USER {user_id}] Движение: {callback.data}")
+
+    # 🔥 ФИКС: Блокируем доступ к игре, чтобы избежать race condition
+    lock = get_user_lock(user_id)
+    async with lock:
+        if user_id not in active_games:
+            await callback.answer("❗ Игра не найдена. Начни новую!", show_alert=True)
+            return
+
+        game = active_games[user_id]
+        if not game.is_alive:
+            await callback.answer("💀 Игра окончена! Начни заново.", show_alert=True)
+            return
+
+        direction = callback.data.split("_")[1]
+        game.move(direction)
+
+        # Обновляем сообщение
+        board = game.render_board()
+        status = f"\nОчки: {game.score} 🎯 | Длина: {len(game.snake)} 🐍 | Уровень: {game.level_name}"
+
+        try:
+            # 🔥 ФИКС: Редактируем ТОЛЬКО текст, клавиатура остаётся
+            await callback.message.edit_text(
+                f"```\n{board}\n```\n{status}",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception as e:
+            logging.warning(f"⚠️ Не удалось обновить сообщение: {e}")
+
+        # Проверка на Game Over
+        if not game.is_alive:
+            record_updated = update_user_record(game.user_id, game.username, game.score)
+            achievements = check_achievements(game)
+            msg = f"💀 *GAME OVER*\n\nОчки: {game.score}\nДлина: {len(game.snake)}"
+            if record_updated:
+                msg += "\n\n🏆 *Новый личный рекорд!*"
+            if achievements:
+                msg += "\n\n🎖️ *Новые достижения:*\n" + "\n".join(achievements)
+
+            kb = [[InlineKeyboardButton(text="🔄 Играть снова", callback_data="start_game")]]
+            try:
+                await callback.message.edit_text(
+                    msg,
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            except Exception as e:
+                logging.error(f"❌ Ошибка при показе Game Over: {e}")
+            del active_games[user_id]
+            return
+
+        # 🔥 ФИКС: Клавиатура НЕ обновляется, если не нужно — убираем моргание
+        # Клавиатура остаётся той же — не вызываем edit_reply_markup
+
+@dp.callback_query(lambda c: c.data == "show_leaderboard")
+async def show_leaderboard(callback: types.CallbackQuery):
+    await callback.answer()
+    top_players = get_top_players()
+    msg = "🏆 *Топ-10 игроков:*\n\n" + "\n".join(f"{i}. @{username} — {score} очков" for i, (username, score) in enumerate(top_players, 1))
+    kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="start_game")]]
+    await callback.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode=ParseMode.MARKDOWN)
+
+@dp.callback_query(lambda c: c.data == "show_achievements")
+async def show_achievements(callback: types.CallbackQuery):
+    await callback.answer()
+    msg = "🎖️ *Достижения:*\n\n1. 🌱 *Новичок* — набрать 10 очков\n2. 🐉 *Охотник* — съесть 5 мобов\n3. 💎 *Коллекционер* — собрать 3 разных бонуса\n4. 🧗 *Альпинист* — пройти уровень 'Пещера'\n5. 🌳 *Покоритель лесов* — пройти уровень 'Лес'"
+    kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="start_game")]]
+    await callback.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode=ParseMode.MARKDOWN)
 
 def check_achievements(game: 'Game') -> list:
     a = []
@@ -117,44 +156,39 @@ def check_achievements(game: 'Game') -> list:
 @dp.message()
 async def any_message(message: types.Message):
     await message.answer("Нажми /start для начала игры!")
-    
+
 async def on_startup():
-    logging.info("🔄 Начинаем инициализацию...")
-    
-    # Шаг 1: Удаляем ЛЮБОЙ существующий вебхук
-    logging.info("🗑️ Удаляем старый вебхук...")
+    logging.info("🔄 [SYSTEM] Запуск бота...")
+    logging.info("🗑️ [SYSTEM] Удаляем старый вебхук...")
     await bot.delete_webhook(drop_pending_updates=True)
-    await asyncio.sleep(1)  # Даём Telegram время применить изменения
+    await asyncio.sleep(1)
 
-    # Шаг 2: Проверяем текущий статус вебхука
     webhook_info = await bot.get_webhook_info()
-    logging.info(f"📡 Текущий вебхук: '{webhook_info.url}'")
+    logging.info(f"📡 [SYSTEM] Текущий вебхук: '{webhook_info.url}'")
 
-    # Шаг 3: Устанавливаем НОВЫЙ вебхук, только если URL изменился
     if webhook_info.url != WEBHOOK_URL:
-        logging.info(f"🔗 Устанавливаем новый вебхук: {WEBHOOK_URL}")
+        logging.info(f"🔗 [SYSTEM] Устанавливаем новый вебхук: {WEBHOOK_URL}")
         result = await bot.set_webhook(WEBHOOK_URL)
         if result:
-            logging.info("✅ Вебхук успешно установлен!")
+            logging.info("✅ [SYSTEM] Вебхук успешно установлен!")
         else:
-            logging.error("❌ Не удалось установить вебхук!")
+            logging.error("❌ [SYSTEM] Не удалось установить вебхук!")
     else:
-        logging.info("✅ Вебхук уже установлен — пропускаем.")
+        logging.info("✅ [SYSTEM] Вебхук уже установлен.")
 
 async def on_shutdown():
-    logging.info("👋 Завершаем работу...")
+    logging.info("👋 [SYSTEM] Завершение работы...")
     await bot.delete_webhook()
-    logging.info("🗑️ Вебхук удалён.")
+    logging.info("🗑️ [SYSTEM] Вебхук удалён.")
 
 async def main():
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Запускаем polling — он будет работать, если вебхук установлен правильно
+    # 🔥 ФИКС: Убрали handle_as_tasks — не нужно для простого бота
     await dp.start_polling(
         bot,
         allowed_updates=["message", "callback_query"],
-        handle_as_tasks=True,
         polling_timeout=30
     )
 
