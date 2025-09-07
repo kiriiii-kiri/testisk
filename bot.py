@@ -5,12 +5,15 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ParseMode
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 from game import Game
 from database import init_db, get_user_record, update_user_record, get_top_players
 
 # 🔥 ГАРАНТИРОВАННО ЧИСТЫЙ URL — ОБРЕЗАЕМ ПРОБЕЛЫ!
 BOT_TOKEN = "8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc"
-WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook".strip()  # ← .strip() УДАЛЯЕТ ВСЕ ПРОБЕЛЫ!
+WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook".strip()
+PORT = int(os.environ.get('PORT', 10000))
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -185,12 +188,25 @@ async def main():
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # 🔥 ФИКС: Убрали handle_as_tasks — не нужно для простого бота
-    await dp.start_polling(
-        bot,
-        allowed_updates=["message", "callback_query"],
-        polling_timeout=30
+    # Настройка веб-сервера для вебхука
+    app = web.Application()
+    webhook_requests_handler = SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
     )
+    webhook_requests_handler.register(app, path="/webhook")
+    setup_application(app, dp, bot=bot)
+    
+    # Запускаем aiohttp сервер
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host="0.0.0.0", port=PORT)
+    await site.start()
+    
+    logging.info(f"🚀 Бот запущен на порту {PORT} с вебхуком {WEBHOOK_URL}")
+    
+    # Бесконечное ожидание
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())
