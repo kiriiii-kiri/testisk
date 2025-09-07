@@ -5,32 +5,33 @@ BOARD_SIZE = 10
 
 class Game:
     def __init__(self, user_id, username):
-    self.user_id = user_id
-    self.username = username
-    self.level = 1  # 1=Пещера, 2=Равнина, 3=Лес
-    self.level_names = {1: "Пещера 🕳️", 2: "Равнина 🌾", 3: "Лес 🌲"}
-    self.level_name = self.level_names[self.level]
-    self.snake = [(5, 5)]  # начальная позиция
-    self.direction = "right"
-    self.score = 0
-    self.is_alive = True
+        # Инициализация атрибутов
+        self.user_id = user_id
+        self.username = username
+        self.level = 1  # 1=Пещера, 2=Равнина, 3=Лес
+        self.level_names = {1: "Пещера 🕳️", 2: "Равнина 🌾", 3: "Лес 🌲"}
+        self.level_name = self.level_names[self.level]
+        self.snake = [(5, 5)]  # начальная позиция
+        self.direction = "right"
+        self.score = 0
+        self.is_alive = True
 
-    # 🔥 Сначала инициализируем ВСЕ структуры данных
-    self.obstacles = generate_obstacles(self.level)
-    self.mobs = []
-    self.bonus = None
-    self.bonus_type = None
-    self.bonus_timer = 0
-    self.portal1 = None
-    self.portal2 = None
-    self.mobs_eaten = 0
-    self.bonuses_collected = set()
+        # Сначала создаём все структуры данных
+        self.obstacles = generate_obstacles(self.level)
+        self.mobs = []
+        self.bonus = None
+        self.bonus_type = None
+        self.bonus_timer = 0
+        self.portal1 = None
+        self.portal2 = None
+        self.mobs_eaten = 0
+        self.bonuses_collected = set()
 
-    # 🔥 Только ПОСЛЕ этого — спавним объекты
-    self.food = self.spawn_food()
-    self.spawn_bonus()
-    self.spawn_portal()
-    self.spawn_mobs()
+        # Только потом спавним объекты
+        self.food = self.spawn_food()
+        self.spawn_bonus()
+        self.spawn_portal()
+        self.spawn_mobs()
 
     def spawn_food(self):
         while True:
@@ -143,18 +144,15 @@ class Game:
     def apply_bonus(self):
         self.bonuses_collected.add(self.bonus_type)
         if self.bonus_type == "speed_up":
-            # Визуально не влияет — можно добавить скорости в будущем
             self.score += 2
         elif self.bonus_type == "grow":
             self.snake.append(self.snake[-1])  # удлиняем на 1
             self.score += 3
         elif self.bonus_type == "invincibility":
-            # Защита на 5 ходов — MVP: просто очки
             self.score += 5
         elif self.bonus_type == "score_x2":
-            self.score += 4  # бонус за активацию
+            self.score += 4
         elif self.bonus_type == "clear_path":
-            # Убираем 3 случайных препятствия
             for _ in range(min(3, len(self.obstacles))):
                 if self.obstacles:
                     self.obstacles.pop(0)
@@ -163,7 +161,6 @@ class Game:
             self.snake.reverse()
             self.score += 2
         elif self.bonus_type == "teleport":
-            # Телепортируем голову в случайное место
             while True:
                 x = random.randint(0, BOARD_SIZE - 1)
                 y = random.randint(0, BOARD_SIZE - 1)
@@ -206,7 +203,7 @@ class Game:
             elif self.bonus_type == "reverse":
                 board[bx][by] = "🔄"
             elif self.bonus_type == "teleport":
-                board[bx][by] = "🌀"  # Портал-бонус (отдельно от парных порталов)
+                board[bx][by] = "🌀"  # Портал-бонус
 
         # Порталы
         if self.portal1:
