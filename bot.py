@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import os  # ← ЭТО ДОЛЖНО БЫТЬ!
+import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -8,8 +8,9 @@ from aiogram.enums import ParseMode
 from game import Game
 from database import init_db, get_user_record, update_user_record, get_top_players
 
+# 🔥 ИСПРАВЛЕНО: УБРАЛ ЛИШНИЕ ПРОБЕЛЫ!
 BOT_TOKEN = "8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc"
-WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook"  
+WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook"  # ← БЕЗ ПРОБЕЛОВ!
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -83,7 +84,8 @@ async def update_game_message(message: types.Message, game: 'Game'):
     status = f"\nОчки: {game.score} 🎯 | Длина: {len(game.snake)} 🐍 | Уровень: {game.level_name}"
     try:
         await message.edit_text(f"```\n{board}\n```\n{status}", parse_mode=ParseMode.MARKDOWN)
-    except: pass
+    except:
+        pass
 
 async def send_control_buttons(message: types.Message, game: 'Game'):
     kb = [
@@ -96,7 +98,8 @@ async def send_control_buttons(message: types.Message, game: 'Game'):
     ]
     try:
         await message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
-    except: pass
+    except:
+        pass
 
 def check_achievements(game: 'Game') -> list:
     a = []
@@ -110,21 +113,34 @@ def check_achievements(game: 'Game') -> list:
 @dp.message()
 async def any_message(message: types.Message):
     await message.answer("Нажми /start для начала игры!")
-    
-async def main():
-    # 1. Удаляем старый вебхук (чистим конфликт)
+
+# ✅ ИСПРАВЛЕНО: ДОБАВЛЕНА ПРОВЕРКА УСПЕШНОСТИ УСТАНОВКИ ВЕБХУКА
+async def on_startup(bot: Bot):
+    # Удаляем старый вебхук
     await bot.delete_webhook(drop_pending_updates=True)
-    
-    # 2. Устанавливаем новый вебхук
-    await bot.set_webhook(WEBHOOK_URL)
-    
-    # 3. Запускаем веб-сервер, который слушает порт (обязательно для Render!)
+    # Устанавливаем новый и ЖДЁМ ответа
+    result = await bot.set_webhook(WEBHOOK_URL)
+    if result:
+        logging.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
+    else:
+        logging.error("❌ Не удалось установить вебхук!")
+
+async def on_shutdown(bot: Bot):
+    await bot.delete_webhook()
+    logging.info("👋 Webhook удалён при выключении")
+
+async def main():
+    # Регистрируем хуки
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
+    # Запускаем вебхук-сервер
     await dp.start_webhook(
-        webhook_path="/webhook",           # путь, на который Telegram будет слать запросы
-        host="0.0.0.0",                    # ОБЯЗАТЕЛЬНО — иначе Render не увидит порт
-        port=int(os.environ.get("PORT", 10000)),  # Render даёт порт через переменную PORT
+        webhook_path="/webhook",
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000)),
         bot=bot
     )
-    
+
 if __name__ == "__main__":
     asyncio.run(main())
