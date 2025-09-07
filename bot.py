@@ -7,7 +7,7 @@ from aiogram.enums import ParseMode
 from game import Game
 from database import init_db, get_user_record, update_user_record, get_top_players
 
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # Замени перед деплоем!
+BOT_TOKEN = "8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc"  # Замени перед деплоем!
 WEBHOOK_URL = "https://your-subdomain.onrender.com/webhook"  # Замени в Render
 
 logging.basicConfig(level=logging.INFO)
