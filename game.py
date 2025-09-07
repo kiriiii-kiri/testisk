@@ -5,18 +5,17 @@ BOARD_SIZE = 10
 
 class Game:
     def __init__(self, user_id, username):
-        # Инициализация атрибутов
         self.user_id = user_id
         self.username = username
-        self.level = 1  # 1=Пещера, 2=Равнина, 3=Лес
+        self.level = 1
         self.level_names = {1: "Пещера 🕳️", 2: "Равнина 🌾", 3: "Лес 🌲"}
         self.level_name = self.level_names[self.level]
-        self.snake = [(5, 5)]  # начальная позиция
+        self.snake = [(5, 5)]
         self.direction = "right"
         self.score = 0
         self.is_alive = True
 
-        # Сначала создаём все структуры данных
+        # Создаём структуры
         self.obstacles = generate_obstacles(self.level)
         self.mobs = []
         self.bonus = None
@@ -27,43 +26,56 @@ class Game:
         self.mobs_eaten = 0
         self.bonuses_collected = set()
 
-        # Только потом спавним объекты
+        # Спавним объекты
         self.food = self.spawn_food()
         self.spawn_bonus()
         self.spawn_portal()
         self.spawn_mobs()
 
     def spawn_food(self):
-        while True:
+        for _ in range(100):  # 🔥 ФИКС: защита от бесконечного цикла
             x = random.randint(0, BOARD_SIZE - 1)
             y = random.randint(0, BOARD_SIZE - 1)
             pos = (x, y)
-            if pos not in self.snake and pos not in self.obstacles and pos != self.bonus and pos != self.portal1 and pos != self.portal2 and pos not in self.mobs:
+            if (pos not in self.snake and pos not in self.obstacles and
+                pos != self.bonus and pos != self.portal1 and
+                pos != self.portal2 and pos not in self.mobs):
                 return pos
+        # Если не нашли — возвращаем безопасную позицию
+        return (0, 0)
 
     def spawn_bonus(self):
         if random.random() < 0.3 and not self.bonus:
             bonus_types = ["speed_up", "grow", "invincibility", "score_x2", "clear_path", "reverse", "teleport"]
             self.bonus_type = random.choice(bonus_types)
             self.bonus = self.spawn_food()
-            self.bonus_timer = 10  # исчезнет через 10 ходов
+            self.bonus_timer = 10
 
     def spawn_portal(self):
         if random.random() < 0.2:
-            self.portal1, self.portal2 = generate_portal_pair(self.snake, self.obstacles, self.food, BOARD_SIZE)
+            try:
+                self.portal1, self.portal2 = generate_portal_pair(self.snake, self.obstacles, self.food, BOARD_SIZE)
+            except:
+                self.portal1 = self.portal2 = None  # 🔥 ФИКС: защита от ошибки
 
     def spawn_mobs(self):
         mob_count = {1: 1, 2: 2, 3: 3}[self.level]
         for _ in range(mob_count):
-            while True:
+            for _ in range(50):  # 🔥 ФИКС: защита от бесконечного цикла
                 x = random.randint(0, BOARD_SIZE - 1)
                 y = random.randint(0, BOARD_SIZE - 1)
                 pos = (x, y)
-                if pos not in self.snake and pos not in self.obstacles and pos != self.food and pos != self.bonus and pos != self.portal1 and pos != self.portal2 and pos not in self.mobs:
+                if (pos not in self.snake and pos not in self.obstacles and
+                    pos != self.food and pos != self.bonus and
+                    pos != self.portal1 and pos != self.portal2 and
+                    pos not in self.mobs):
                     self.mobs.append(pos)
                     break
 
     def move(self, direction):
+        if not self.is_alive:
+            return
+
         self.direction = direction
         head_x, head_y = self.snake[0]
 
@@ -78,28 +90,26 @@ class Game:
         else:
             return
 
-        # Проверка выхода за границы
+        # Проверки
         if not (0 <= new_head[0] < BOARD_SIZE and 0 <= new_head[1] < BOARD_SIZE):
             self.is_alive = False
             return
 
-        # Проверка столкновения с собой
-        if new_head in self.snake:
+        if new_head in self.snake[1:]:  # 🔥 ФИКС: не проверяем голову
             self.is_alive = False
             return
 
-        # Проверка столкновения с препятствием
         if new_head in self.obstacles:
             self.is_alive = False
             return
 
         # Порталы
-        if new_head == self.portal1 and self.portal2:
-            new_head = self.portal2
-        elif new_head == self.portal2 and self.portal1:
-            new_head = self.portal1
+        if self.portal1 and self.portal2:
+            if new_head == self.portal1:
+                new_head = self.portal2
+            elif new_head == self.portal2:
+                new_head = self.portal1
 
-        # Съел еду?
         ate_food = False
         if new_head == self.food:
             self.score += 1
@@ -107,34 +117,28 @@ class Game:
             self.food = self.spawn_food()
             self.spawn_bonus()
             self.spawn_portal()
-            # Повышение уровня каждые 10 очков
             if self.score % 10 == 0 and self.level < 3:
                 self.level += 1
                 self.level_name = self.level_names[self.level]
                 self.obstacles = generate_obstacles(self.level)
                 self.spawn_mobs()
 
-        # Съел бонус?
         if new_head == self.bonus and self.bonus:
             self.apply_bonus()
             self.bonus = None
             self.bonus_type = None
 
-        # Съел моба?
-        if new_head in self.mobs:
-            if len(self.snake) >= 5:  # Только если длина >= 5
-                mob_points = random.randint(1, 3)
-                self.score += mob_points
-                self.mobs_eaten += 1
-                self.mobs.remove(new_head)
-                self.spawn_mobs()  # Респавн моба
+        if new_head in self.mobs and len(self.snake) >= 5:
+            mob_points = random.randint(1, 3)
+            self.score += mob_points
+            self.mobs_eaten += 1
+            self.mobs.remove(new_head)
+            self.spawn_mobs()
 
-        # Двигаем змею
         self.snake.insert(0, new_head)
         if not ate_food:
             self.snake.pop()
 
-        # Таймер бонуса
         if self.bonus:
             self.bonus_timer -= 1
             if self.bonus_timer <= 0:
@@ -142,70 +146,62 @@ class Game:
                 self.bonus_type = None
 
     def apply_bonus(self):
-        self.bonuses_collected.add(self.bonus_type)
-        if self.bonus_type == "speed_up":
-            self.score += 2
-        elif self.bonus_type == "grow":
-            self.snake.append(self.snake[-1])  # удлиняем на 1
-            self.score += 3
-        elif self.bonus_type == "invincibility":
-            self.score += 5
-        elif self.bonus_type == "score_x2":
-            self.score += 4
-        elif self.bonus_type == "clear_path":
-            for _ in range(min(3, len(self.obstacles))):
-                if self.obstacles:
-                    self.obstacles.pop(0)
-            self.score += 5
-        elif self.bonus_type == "reverse":
-            self.snake.reverse()
-            self.score += 2
-        elif self.bonus_type == "teleport":
-            while True:
-                x = random.randint(0, BOARD_SIZE - 1)
-                y = random.randint(0, BOARD_SIZE - 1)
-                pos = (x, y)
-                if pos not in self.obstacles and pos != self.food and pos not in self.mobs:
-                    self.snake[0] = pos
-                    break
-            self.score += 3
+        if self.bonus_type:
+            self.bonuses_collected.add(self.bonus_type)
+
+        bonus_effects = {
+            "speed_up": lambda: setattr(self, 'score', self.score + 2),
+            "grow": lambda: (self.snake.append(self.snake[-1]), setattr(self, 'score', self.score + 3)),
+            "invincibility": lambda: setattr(self, 'score', self.score + 5),
+            "score_x2": lambda: setattr(self, 'score', self.score + 4),
+            "clear_path": lambda: (
+                [self.obstacles.pop(0) for _ in range(min(3, len(self.obstacles)))],
+                setattr(self, 'score', self.score + 5)
+            ),
+            "reverse": lambda: (self.snake.reverse(), setattr(self, 'score', self.score + 2)),
+            "teleport": self._teleport_head
+        }
+
+        effect = bonus_effects.get(self.bonus_type)
+        if effect:
+            effect()
+
+    def _teleport_head(self):
+        for _ in range(50):
+            x = random.randint(0, BOARD_SIZE - 1)
+            y = random.randint(0, BOARD_SIZE - 1)
+            pos = (x, y)
+            if pos not in self.obstacles and pos != self.food and pos not in self.mobs:
+                self.snake[0] = pos
+                self.score += 3
+                return
 
     def render_board(self):
         board = [["⬜" for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
 
-        # Препятствия по уровням
+        # Препятствия
+        obstacle_icons = {1: "🪨", 2: "🌿", 3: "🌳"}
         for obs in self.obstacles:
-            if self.level == 1:
-                board[obs[0]][obs[1]] = "🪨"  # Пещера — камни
-            elif self.level == 2:
-                board[obs[0]][obs[1]] = "🌿"  # Равнина — кусты
-            elif self.level == 3:
-                board[obs[0]][obs[1]] = "🌳"  # Лес — деревья
+            board[obs[0]][obs[1]] = obstacle_icons.get(self.level, "🪨")
 
-        # Еда
+        # Объекты
         if self.food:
             fx, fy = self.food
             board[fx][fy] = "🍎"
 
-        # Бонус
-        if self.bonus:
+        bonus_icons = {
+            "speed_up": "⚡",
+            "grow": "💊",
+            "invincibility": "🛡️",
+            "score_x2": "💰",
+            "clear_path": "🧨",
+            "reverse": "🔄",
+            "teleport": "🌀"
+        }
+        if self.bonus and self.bonus_type:
             bx, by = self.bonus
-            if self.bonus_type == "speed_up":
-                board[bx][by] = "⚡"
-            elif self.bonus_type == "grow":
-                board[bx][by] = "💊"
-            elif self.bonus_type == "invincibility":
-                board[bx][by] = "🛡️"
-            elif self.bonus_type == "score_x2":
-                board[bx][by] = "💰"
-            elif self.bonus_type == "clear_path":
-                board[bx][by] = "🧨"  # Взрыв!
-            elif self.bonus_type == "reverse":
-                board[bx][by] = "🔄"
-            elif self.bonus_type == "teleport":
-                board[bx][by] = "🌀"  # Портал-бонус
+            board[bx][by] = bonus_icons.get(self.bonus_type, "🎁")
 
-        # Порталы
         if self.portal1:
             px, py = self.portal1
             board[px][py] = "🔵"
@@ -213,7 +209,6 @@ class Game:
             px, py = self.portal2
             board[px][py] = "🔴"
 
-        # Мобы
         for mob in self.mobs:
             mx, my = mob
             board[mx][my] = "👾"
@@ -221,8 +216,8 @@ class Game:
         # Змея
         for i, (x, y) in enumerate(self.snake):
             if i == 0:
-                board[x][y] = "🟢"  # Голова
+                board[x][y] = "🟢"
             else:
-                board[x][y] = "🟩"  # Тело
+                board[x][y] = "🟩"
 
         return "\n".join("".join(row) for row in board)
