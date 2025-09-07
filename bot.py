@@ -43,26 +43,24 @@ async def start_handler(message: types.Message):
     )
 
 @dp.callback_query(lambda c: c.data == "start_game")
+@dp.callback_query(lambda c: c.data == "start_game")
 async def start_game(callback: types.CallbackQuery):
-    logging.info(f"🎮 Обработан callback: start_game от пользователя {callback.from_user.id}")
     user_id = callback.from_user.id
     logging.info(f"🎮 [USER {user_id}] Нажата кнопка 'Начать игру'")
-    await callback.answer()  # Подтверждаем нажатие сразу
+    await callback.answer()  # ← Это обязательно!
 
     username = callback.from_user.username or f"User{user_id}"
     game = Game(user_id, username)
     active_games[user_id] = game
 
-    # 🔥 ФИКС: Отправляем НОВОЕ сообщение вместо редактирования старого
     board = game.render_board()
     status = f"\nОчки: {game.score} 🎯 | Длина: {len(game.snake)} 🐍 | Уровень: {game.level_name}"
     msg = await callback.message.answer(
         f"```\n{board}\n```\n{status}",
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=await get_control_keyboard()
+        reply_markup=get_control_keyboard()  # ← Теперь без await, потому что функция синхронная
     )
-
-async def get_control_keyboard():
+def get_control_keyboard():
     kb = [
         [InlineKeyboardButton(text="⬆️", callback_data="move_up")],
         [
