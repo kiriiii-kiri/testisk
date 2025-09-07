@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -109,10 +110,18 @@ def check_achievements(game: 'Game') -> list:
 @dp.message()
 async def any_message(message: types.Message):
     await message.answer("Нажми /start для начала игры!")
-
+    
 async def main():
+    # Удаляем старый вебхук (на всякий случай)
+    await bot.delete_webhook(drop_pending_updates=True)
+    # Устанавливаем новый вебхук
     await bot.set_webhook(WEBHOOK_URL)
-    await dp.start_polling(bot)
-
+    # Запускаем вебхук-сервер (а не polling!)
+    await dp.start_webhook(
+        webhook_path="/webhook",
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000)),  # Render использует PORT
+        bot=bot
+    )
 if __name__ == "__main__":
     asyncio.run(main())
