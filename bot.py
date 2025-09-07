@@ -73,6 +73,7 @@ def get_control_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 @dp.callback_query(lambda c: c.data.startswith("move_"))
+@dp.callback_query(lambda c: c.data.startswith("move_"))
 async def handle_move(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     logging.info(f"🐍 [USER {user_id}] Движение: {callback.data}")
@@ -97,10 +98,11 @@ async def handle_move(callback: types.CallbackQuery):
         status = f"\nОчки: {game.score} 🎯 | Длина: {len(game.snake)} 🐍 | Уровень: {game.level_name}"
 
         try:
-            # 🔥 ФИКС: Редактируем ТОЛЬКО текст, клавиатура остаётся
+            # 🔥 ФИКС: Обновляем и текст, И клавиатуру!
             await callback.message.edit_text(
                 f"```\n{board}\n```\n{status}",
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=get_control_keyboard()  # ← ДОБАВЛЕНО!
             )
         except Exception as e:
             logging.warning(f"⚠️ Не удалось обновить сообщение: {e}")
@@ -127,20 +129,36 @@ async def handle_move(callback: types.CallbackQuery):
             del active_games[user_id]
             return
 
+        # 🔥 Клавиатура ОБНОВЛЯЕТСЯ здесь (в edit_text выше) — не нужно отдельно!
+
 @dp.callback_query(lambda c: c.data == "show_leaderboard")
 async def show_leaderboard(callback: types.CallbackQuery):
     await callback.answer()
     top_players = get_top_players()
     msg = "🏆 *Топ-10 игроков:*\n\n" + "\n".join(f"{i}. @{username} — {score} очков" for i, (username, score) in enumerate(top_players, 1))
-    kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="start_game")]]
+  kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu")]]
     await callback.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode=ParseMode.MARKDOWN)
 
 @dp.callback_query(lambda c: c.data == "show_achievements")
 async def show_achievements(callback: types.CallbackQuery):
     await callback.answer()
     msg = "🎖️ *Достижения:*\n\n1. 🌱 *Новичок* — набрать 10 очков\n2. 🐉 *Охотник* — съесть 5 мобов\n3. 💎 *Коллекционер* — собрать 3 разных бонуса\n4. 🧗 *Альпинист* — пройти уровень 'Пещера'\n5. 🌳 *Покоритель лесов* — пройти уровень 'Лес'"
-    kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="start_game")]]
+  kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu")]]
     await callback.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode=ParseMode.MARKDOWN)
+
+@dp.callback_query(lambda c: c.data == "main_menu")
+async def back_to_menu(callback: types.CallbackQuery):
+    await callback.answer()
+    kb = [
+        [InlineKeyboardButton(text="▶️ Начать игру", callback_data="start_game")],
+        [InlineKeyboardButton(text="🏆 Рекорды", callback_data="show_leaderboard")],
+        [InlineKeyboardButton(text="🎖️ Достижения", callback_data="show_achievements")]
+    ]
+    await callback.message.edit_text(
+        "🐍 *Snake RPG Evolution*\n\nСъедай еду, избегай препятствий, собирай бонусы и мобов!\nЧем длиннее змея — тем сильнее ты становишься.\n\nВыбери действие:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+        parse_mode=ParseMode.MARKDOWN
+    )
 
 def check_achievements(game: 'Game') -> list:
     a = []
