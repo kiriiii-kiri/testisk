@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import os
+import os  # ← ЭТО ДОЛЖНО БЫТЬ!
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -9,7 +9,7 @@ from game import Game
 from database import init_db, get_user_record, update_user_record, get_top_players
 
 BOT_TOKEN = "8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc"
-WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook"
+WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook"  
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -112,16 +112,19 @@ async def any_message(message: types.Message):
     await message.answer("Нажми /start для начала игры!")
     
 async def main():
-    # Удаляем старый вебхук (на всякий случай)
+    # 1. Удаляем старый вебхук (чистим конфликт)
     await bot.delete_webhook(drop_pending_updates=True)
-    # Устанавливаем новый вебхук
+    
+    # 2. Устанавливаем новый вебхук
     await bot.set_webhook(WEBHOOK_URL)
-    # Запускаем вебхук-сервер (а не polling!)
+    
+    # 3. Запускаем веб-сервер, который слушает порт (обязательно для Render!)
     await dp.start_webhook(
-        webhook_path="/webhook",
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000)),  # Render использует PORT
+        webhook_path="/webhook",           # путь, на который Telegram будет слать запросы
+        host="0.0.0.0",                    # ОБЯЗАТЕЛЬНО — иначе Render не увидит порт
+        port=int(os.environ.get("PORT", 10000)),  # Render даёт порт через переменную PORT
         bot=bot
     )
+    
 if __name__ == "__main__":
     asyncio.run(main())
