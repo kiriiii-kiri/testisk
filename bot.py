@@ -8,9 +8,9 @@ from aiogram.enums import ParseMode
 from game import Game
 from database import init_db, get_user_record, update_user_record, get_top_players
 
-# 🔥 ФИКС: УБРАЛИ ПРОБЕЛЫ ИЗ URL
+# 🔥 ГАРАНТИРОВАННО ЧИСТЫЙ URL — ОБРЕЗАЕМ ПРОБЕЛЫ!
 BOT_TOKEN = "8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc"
-WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook".strip()  # ← Без пробелов!
+WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook".strip()  # ← .strip() УДАЛЯЕТ ВСЕ ПРОБЕЛЫ!
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
