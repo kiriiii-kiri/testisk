@@ -44,6 +44,7 @@ async def start_handler(message: types.Message):
 
 @dp.callback_query(lambda c: c.data == "start_game")
 async def start_game(callback: types.CallbackQuery):
+    logging.info(f"🎮 Обработан callback: start_game от пользователя {callback.from_user.id}")
     user_id = callback.from_user.id
     logging.info(f"🎮 [USER {user_id}] Нажата кнопка 'Начать игру'")
     await callback.answer()  # Подтверждаем нажатие сразу
@@ -129,6 +130,7 @@ async def handle_move(callback: types.CallbackQuery):
 
 @dp.callback_query(lambda c: c.data == "show_leaderboard")
 async def show_leaderboard(callback: types.CallbackQuery):
+    logging.info(f"🏆 Обработан callback: show_leaderboard от пользователя {callback.from_user.id}")
     await callback.answer()
     top_players = get_top_players()
     msg = "🏆 *Топ-10 игроков:*\n\n" + "\n".join(f"{i}. @{username} — {score} очков" for i, (username, score) in enumerate(top_players, 1))
@@ -180,27 +182,32 @@ async def on_shutdown():
     logging.info("🗑️ [SYSTEM] Вебхук удалён.")
 
 async def main():
+    # Регистрируем хуки
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Настройка веб-сервера для вебхука
+    # Создаём aiohttp приложение
     app = web.Application()
+
+    # 🔥 ИСПРАВЛЕНО: Передаём bot в SimpleRequestHandler
     webhook_requests_handler = SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
     )
     webhook_requests_handler.register(app, path="/webhook")
+
+    # 🔥 ИСПРАВЛЕНО: Передаём bot в setup_application
     setup_application(app, dp, bot=bot)
-    
-    # Запускаем aiohttp сервер
+
+    # Запускаем сервер
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, host="0.0.0.0", port=PORT)
     await site.start()
-    
+
     logging.info(f"🚀 Бот запущен на порту {PORT} с вебхуком {WEBHOOK_URL}")
-    
-    # Бесконечное ожидание
+
+    # Ждём бесконечно
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
