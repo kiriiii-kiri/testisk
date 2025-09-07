@@ -12,7 +12,7 @@ from database import init_db, get_user_record, update_user_record, get_top_playe
 
 # 🔥 ГАРАНТИРОВАННО ЧИСТЫЙ URL — ОБРЕЗАЕМ ПРОБЕЛЫ!
 BOT_TOKEN = "8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc"
-WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook".strip()
+WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook".strip()  # ← .strip() УДАЛЯЕТ ВСЕ ПРОБЕЛЫ!
 PORT = int(os.environ.get('PORT', 10000))
 
 logging.basicConfig(level=logging.INFO)
@@ -43,11 +43,10 @@ async def start_handler(message: types.Message):
     )
 
 @dp.callback_query(lambda c: c.data == "start_game")
-@dp.callback_query(lambda c: c.data == "start_game")
 async def start_game(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     logging.info(f"🎮 [USER {user_id}] Нажата кнопка 'Начать игру'")
-    await callback.answer()  # ← Это обязательно!
+    await callback.answer()  # Подтверждаем нажатие сразу
 
     username = callback.from_user.username or f"User{user_id}"
     game = Game(user_id, username)
@@ -58,8 +57,10 @@ async def start_game(callback: types.CallbackQuery):
     msg = await callback.message.answer(
         f"```\n{board}\n```\n{status}",
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=get_control_keyboard()  # ← Теперь без await, потому что функция синхронная
+        reply_markup=get_control_keyboard()  # ← БЕЗ await, потому что функция синхронная
     )
+
+# 🔥 ИСПРАВЛЕНО: УБРАН async — функция теперь синхронная!
 def get_control_keyboard():
     kb = [
         [InlineKeyboardButton(text="⬆️", callback_data="move_up")],
@@ -128,7 +129,6 @@ async def handle_move(callback: types.CallbackQuery):
 
 @dp.callback_query(lambda c: c.data == "show_leaderboard")
 async def show_leaderboard(callback: types.CallbackQuery):
-    logging.info(f"🏆 Обработан callback: show_leaderboard от пользователя {callback.from_user.id}")
     await callback.answer()
     top_players = get_top_players()
     msg = "🏆 *Топ-10 игроков:*\n\n" + "\n".join(f"{i}. @{username} — {score} очков" for i, (username, score) in enumerate(top_players, 1))
@@ -180,24 +180,19 @@ async def on_shutdown():
     logging.info("🗑️ [SYSTEM] Вебхук удалён.")
 
 async def main():
-    # Регистрируем хуки
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Создаём aiohttp приложение
+    # Настройка веб-сервера для вебхука
     app = web.Application()
-
-    # 🔥 ИСПРАВЛЕНО: Передаём bot в SimpleRequestHandler
     webhook_requests_handler = SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
     )
     webhook_requests_handler.register(app, path="/webhook")
-
-    # 🔥 ИСПРАВЛЕНО: Передаём bot в setup_application
     setup_application(app, dp, bot=bot)
 
-    # Запускаем сервер
+    # Запускаем aiohttp сервер
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, host="0.0.0.0", port=PORT)
@@ -205,7 +200,7 @@ async def main():
 
     logging.info(f"🚀 Бот запущен на порту {PORT} с вебхуком {WEBHOOK_URL}")
 
-    # Ждём бесконечно
+    # Бесконечное ожидание
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
