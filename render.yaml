@@ -9,5 +9,7 @@ services:
         sync: false
       - key: WEBHOOK_URL
         sync: false
+      - key: PORT
+        value: 10000
     regions:
       - oregon
