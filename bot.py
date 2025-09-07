@@ -150,9 +150,10 @@ async def main():
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
+    # Запускаем polling — он будет работать, если вебхук установлен правильно
     await dp.start_polling(
         bot,
-        allowed_updates=["message", "callback_query"],  # ← callback_query ОБЯЗАТЕЛЕН!
+        allowed_updates=["message", "callback_query"],
         handle_as_tasks=True,
         polling_timeout=30
     )
