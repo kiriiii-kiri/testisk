@@ -6,9 +6,9 @@ services:
     startCommand: python bot.py
     envVars:
       - key: BOT_TOKEN
-        sync: false
+        value: 8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc
       - key: WEBHOOK_URL
-        sync: false
+        value: https://testisk-zmeika.onrender.com/webhook
       - key: PORT
         value: 10000
     regions:
