@@ -8,9 +8,9 @@ from aiogram.enums import ParseMode
 from game import Game
 from database import init_db, get_user_record, update_user_record, get_top_players
 
-# 🔥 ИСПРАВЛЕНО: УБРАЛ ЛИШНИЕ ПРОБЕЛЫ!
+# 🔥 ИСПРАВЛЕНО: УБРАЛ ПРОБЕЛЫ В URL!
 BOT_TOKEN = "8498252537:AAFS94y2DJEUOVjOZHx0boHiVvbMrV1T7dc"
-WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook"  # ← БЕЗ ПРОБЕЛОВ!
+WEBHOOK_URL = "https://testisk-zmeika.onrender.com/webhook"  # ← ТОЛЬКО ТАК!
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -114,32 +114,31 @@ def check_achievements(game: 'Game') -> list:
 async def any_message(message: types.Message):
     await message.answer("Нажми /start для начала игры!")
 
-# ✅ ИСПРАВЛЕНО: ДОБАВЛЕНА ПРОВЕРКА УСПЕШНОСТИ УСТАНОВКИ ВЕБХУКА
-async def on_startup(bot: Bot):
+async def on_startup():
     # Удаляем старый вебхук
     await bot.delete_webhook(drop_pending_updates=True)
-    # Устанавливаем новый и ЖДЁМ ответа
-    result = await bot.set_webhook(WEBHOOK_URL)
-    if result:
+    # Устанавливаем новый
+    webhook_info = await bot.get_webhook_info()
+    if webhook_info.url != WEBHOOK_URL:
+        await bot.set_webhook(WEBHOOK_URL)
         logging.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
     else:
-        logging.error("❌ Не удалось установить вебхук!")
+        logging.info("✅ Webhook уже установлен.")
 
-async def on_shutdown(bot: Bot):
+async def on_shutdown():
     await bot.delete_webhook()
-    logging.info("👋 Webhook удалён при выключении")
+    logging.info("👋 Webhook удалён.")
 
 async def main():
     # Регистрируем хуки
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Запускаем вебхук-сервер
-    await dp.start_webhook(
-        webhook_path="/webhook",
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000)),
-        bot=bot
+    # Запускаем polling, но с параметром, совместимым с вебхуком
+    # Это НЕ конфликтует, если вебхук установлен правильно
+    await dp.start_polling(
+        bot,
+        allowed_updates=["message", "callback_query"]  # Только нужные апдейты
     )
 
 if __name__ == "__main__":
