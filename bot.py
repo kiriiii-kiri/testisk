@@ -136,14 +136,14 @@ async def show_leaderboard(callback: types.CallbackQuery):
     await callback.answer()
     top_players = get_top_players()
     msg = "🏆 *Топ-10 игроков:*\n\n" + "\n".join(f"{i}. @{username} — {score} очков" for i, (username, score) in enumerate(top_players, 1))
-  kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu")]]
+    kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu")]]
     await callback.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode=ParseMode.MARKDOWN)
 
 @dp.callback_query(lambda c: c.data == "show_achievements")
 async def show_achievements(callback: types.CallbackQuery):
     await callback.answer()
     msg = "🎖️ *Достижения:*\n\n1. 🌱 *Новичок* — набрать 10 очков\n2. 🐉 *Охотник* — съесть 5 мобов\n3. 💎 *Коллекционер* — собрать 3 разных бонуса\n4. 🧗 *Альпинист* — пройти уровень 'Пещера'\n5. 🌳 *Покоритель лесов* — пройти уровень 'Лес'"
-  kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu")]]
+    kb = [[InlineKeyboardButton(text="⬅️ Назад", callback_data="main_menu")]]
     await callback.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode=ParseMode.MARKDOWN)
 
 @dp.callback_query(lambda c: c.data == "main_menu")
