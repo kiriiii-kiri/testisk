@@ -11,5 +11,7 @@ services:
         value: https://testisk-zmeika.onrender.com/webhook
       - key: PORT
         value: 10000
+    healthCheckPath: /health
+    autoDeploy: true
     regions:
       - oregon
